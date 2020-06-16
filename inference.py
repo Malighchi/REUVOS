@@ -1,5 +1,6 @@
 import config
 import torch
+import os
 import numpy as np
 from PIL import Image
 import torch.nn as nn
@@ -56,11 +57,18 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 					#c.save(str(frame) + '.png', "PNG", mode='P')
 					#print("segmentation saved...")
 			mask_for_frames = np.argmax(segs_concat, axis=1)
-			mask_for_frames = (mask_for_frames * 255).astype(np.uint8)
+			mask_for_frames = (mask_for_frames.squeeze() * 255).astype(np.uint8)
 			print("finsihed object segmentation...")
-			c = Image.fromarray(mask_for_frames, mode='P')
-			c.putpalette(Image.ADAPTIVE)
-			c.save('test.png', "PNG", mode='P')
+			try:
+				dir = 'SavedImages/%d/' % video
+				os.mkdir(dir)
+			except:
+				pass
+			for images in range(len(mask_for_frames)):
+				c = Image.fromarray(mask_for_frames[images], mode='P')
+				#c.putpalette(Image.ADAPTIVE)
+				img_path = dir +'%d.png' %images
+				c.save(img_path, "PNG", mode='P')
 			print("segmentation saved...")
 	
 if __name__ == '__main__':
