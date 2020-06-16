@@ -7,38 +7,61 @@ from model import VOSModel
 from dataloader import ValidationDataset
 
 def inference(model_path = './SavedModels/folder/model.pth'):
-	model = torch.load(model_path)
-	model.eval()
 	criterion = nn.BCELoss(reduction='mean')
+	model = VOSModel()
+	load_model = torch.load(model_path)
+	model.load_state_dict(load_model['state_dict'])
 	if config.use_cuda:
 		model.cuda()
+	model.eval()
+	print("model loaded...")
 
 	with torch.no_grad():
 		valid_dataset = ValidationDataset()
+		print('dataset loaded...')
 		for video in range(len(valid_dataset.valid_frames)):
+			segs_concat = np.array([])
 			for object in range(len(valid_dataset.valid_frames[video])):
-				for frame in range(len(valid_dataset.valid_frames[video][object])):
+				frame = 0
+				y_pred_concat = np.array([])
+				while frame < len(valid_dataset.valid_frames[video][object]):
 					# Batch-size of model during inference would be 1, because we compute segmentations for 1 video at-a-time
 					if(frame == 0):
-						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder()
+						initial_frame_path = valid_dataset.valid_annotations[video][object][0].replace('Annotations', 'JPEGImages')
+						initial_frame_path = initial_frame_path.replace('png', 'jpg')
+						frame = valid_dataset.valid_frames[video][object].index(initial_frame_path)
+						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame)
+						last_frame = video_annotations_batch[:, :, 0]
 					else:
-						frame_nums = 32
 						last_frame = video_annotations_batch[:, :, -1]
-						if(frame+frame_nums >= len(valid_dataset.valid_frames[video][object])):
-							frame_nums = len(valid_dataset.valid_frames[video][object]) - frame
-						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame, num_frames=frame_nums)
+						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame)
+					print(video_inputs_batch.shape)
+					print(video_annotations_batch.shape)
+					print(video_annotations_indeces_batch.shape)
 					y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], last_frame)
 					print(criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :]).item())
-					frame+=32
-					# The model output is (1, 1, 32, 224, 224)
-					# Hence, we use the 32nd predicted output frame as 'first_frame_input' during next pass to the model
-				# Since, we now have separate segmentation mask for each object np.argmax should help with creating single mask for the entire frame
-				# We can save the video-frames using:
-
-				c = Image.fromarray(y_pred, mode='P')
-				#c.putpalette(img_palette)
-				c.save('frame_name', "PNG", mode='P')
+					frame += 32
+					if y_pred_concat.size == 0:
+						y_pred_concat = y_pred.cpu().numpy()
+					else:
+						y_pred_concat = np.concatenate((y_pred_concat, y_pred.cpu().numpy()), axis=2)
+				if segs_concat.size == 0:
+					segs_concat = y_pred_concat
+				else:
+					segs_concat = np.concatenate((segs_concat, y_pred_concat), axis=1)
+					#print("finsihed object segmentation...")
+					#annotation = (y_pred[0][0][0].cpu().numpy() * 255).astype(np.uint8)
+					#c = Image.fromarray(annotation, mode='P')
+					#c.putpalette(Image.ADAPTIVE)
+					#c.save(str(frame) + '.png', "PNG", mode='P')
+					#print("segmentation saved...")
+			mask_for_frames = np.argmax(segs_concat, axis=1)
+			mask_for_frames = (mask_for_frames * 255).astype(np.uint8)
+			print("finsihed object segmentation...")
+			c = Image.fromarray(mask_for_frames, mode='P')
+			c.putpalette(Image.ADAPTIVE)
+			c.save('test.png', "PNG", mode='P')
+			print("segmentation saved...")
 	
 if __name__ == '__main__':
-    model_path = './SavedModels/Run_2020-06-15 09,33,24/model_1_0.6919.pth'
-    inference()
+    inference(config.model_path)

@@ -5,11 +5,13 @@ from datetime import datetime
 use_cuda = cuda.is_available()
 
 n_epochs = 50
-batch_size = 4
+batch_size = 2
 
 learning_rate = 1e-3
 weight_decay = 1e-7
 
 model_id = datetime.now().strftime('%Y-%m-%d %H,%M,%S')
 save_dir = './SavedModels/Run_%s/' % model_id
+
+model_path = './SavedModels/modeel_50_0.5433.pth'
 
