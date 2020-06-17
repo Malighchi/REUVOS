@@ -34,18 +34,19 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame)
 						last_frame = video_annotations_batch[:, :, 0]
 					else:
-						last_frame = video_annotations_batch[:, :, -1]
+						last_frame = y_pred[:, :, -1]
 						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame)
 					print(video_inputs_batch.shape)
 					print(video_annotations_batch.shape)
 					print(video_annotations_indeces_batch.shape)
+					last_array = torch.round(last_frame).cpu().numpy().astype(np.uint8)
 					y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], last_frame)
 					print(criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :]).item())
 					frame += 32
 					if y_pred_concat.size == 0:
-						y_pred_concat = y_pred.cpu().numpy()
+						y_pred_concat = torch.round(y_pred).cpu().numpy()
 					else:
-						y_pred_concat = np.concatenate((y_pred_concat, y_pred.cpu().numpy()), axis=2)
+						y_pred_concat = np.concatenate((y_pred_concat, torch.round(y_pred).cpu().numpy()), axis=2)
 				if segs_concat.size == 0:
 					segs_concat = y_pred_concat
 				else:
@@ -56,17 +57,18 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 					#c.putpalette(Image.ADAPTIVE)
 					#c.save(str(frame) + '.png', "PNG", mode='P')
 					#print("segmentation saved...")
-			mask_for_frames = np.argmax(segs_concat, axis=1)
-			mask_for_frames = (mask_for_frames.squeeze() * 255).astype(np.uint8)
+			segs_concat = (segs_concat.squeeze())
+			mask_for_frames = np.argmax(segs_concat, axis=0)
 			print("finsihed object segmentation...")
 			try:
 				dir = 'SavedImages/%d/' % video
 				os.mkdir(dir)
 			except:
 				pass
-			for images in range(len(mask_for_frames)):
-				c = Image.fromarray(mask_for_frames[images], mode='P')
-				#c.putpalette(Image.ADAPTIVE)
+			palette = Image.open(valid_dataset.valid_annotations[video][0][0])
+			for images in range(len(segs_concat)):
+				c = Image.fromarray(segs_concat[images][0], mode='P')
+				c.putpalette(palette.getpalette())
 				img_path = dir +'%d.png' %images
 				c.save(img_path, "PNG", mode='P')
 			print("segmentation saved...")

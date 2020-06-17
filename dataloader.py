@@ -92,18 +92,6 @@ class TrainDataset():
                 frame = np.array(Image.fromarray(frame).resize(size=(img_size_x, img_size_y)))
                 annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
 
-                #annotation = (annotation * 65025 * 225 ).astype(np.uint8)
-                #frame = frame.astype(np.uint8)
-
-                #frame = np.transpose(frame, (2, 0, 1))
-                #c = Image.fromarray(frame[0], mode='P')
-                #c.putpalette(Image.ADAPTIVE)
-                #c.save('frame.png', "PNG", mode='P')
-                #d = Image.fromarray(annotation, mode='P')
-                #d.putpalette(Image.ADAPTIVE)
-                #d.save('ann.png', "PNG", mode='P')
-                #print("segmentation saved...")
-
                 train_sample_frames.append(frame)
                 train_sample_annotations[0].append(annotation)
             except:
@@ -193,22 +181,6 @@ class ValidationDataset():
                 frame = np.array(Image.open(self.valid_frames[video_index][object_index][frames]))
                 if(frames-initial_frame == 0):
                     vid_height, vid_width, _ = frame.shape
-                if(vid_width >vid_height):
-                    new_height_min = 0
-                    new_height_max = vid_height
-                    new_width_min = int(((vid_width/2) - (vid_height/2)))
-                    new_width_max = int(((vid_width/2) + (vid_height/2)))
-                elif(vid_width < vid_height):
-                    new_height_min = int(((vid_height/2) - (vid_width/2)))
-                    new_height_max =  int(((vid_height/2) + (vid_width/2)))
-                    new_width_min = 0
-                    new_width_max = vid_width
-                else:
-                    new_height_min = 0
-                    new_height_max = vid_height
-                    new_width_min = 0
-                    new_width_max = vid_width
-                frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
 
                 annotation_path = self.valid_frames[video_index][object_index][frames].replace('JPEGImages', 'Annotations')
                 annotation_path = annotation_path.replace('jpg', 'png')
@@ -219,9 +191,9 @@ class ValidationDataset():
                 else:
                     annotation = np.zeros((vid_height, vid_width))
 
-                annotation = annotation[new_height_min:new_height_max, new_width_min:new_width_max]
                 frame = np.array(Image.fromarray(frame).resize(size=(img_size_x, img_size_y)))
                 annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
+
                 valid_sample_frames.append(frame)
                 valid_sample_annotations[0].append(annotation)
             except:
@@ -267,6 +239,7 @@ class ValidationDataset():
         video_inputs_batch = torch.from_numpy(video_inputs_batch)
         video_annotations_batch = torch.from_numpy(video_annotations_batch)
         video_inputs_batch, video_annotations_batch = video_inputs_batch.type(torch.float), video_annotations_batch.type(torch.float)
+        test = video_annotations_batch.numpy()
         if config.use_cuda:
             video_inputs_batch = video_inputs_batch.cuda()
             video_annotations_batch = video_annotations_batch.cuda()
