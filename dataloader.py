@@ -6,8 +6,10 @@ import numpy as np
 import random
 import torch
 from PIL import Image
+from torch.utils.data import Dataset
 
-class TrainDataset():
+
+class TrainDataset(Dataset):
     def __init__(self, root='./data/train/'):
         self.train_frames = []
         self.train_annotations = []
@@ -40,7 +42,8 @@ class TrainDataset():
     def __len__(self):
         return len(self.train_frames)
 
-    def __getitem__(self, index=0, img_size_x = 224, img_size_y=224):
+    def __getitem__(self, index):
+        img_size_x, img_size_y = 224
         train_sample_frames = []#torch.zeros(32, 224, 224, 3)
         train_sample_annotations = []  # torch.zeros(1, 224, 224)
         train_sample_annotations.append([])
@@ -113,6 +116,8 @@ class TrainDataset():
         #print(train_sample_annotations_indeces.shape)
 
         return train_sample_frames, train_sample_annotations, train_sample_annotations_indeces
+
+'''
     def Datalaoder(self):
         video_inputs_batch = []
         video_annotations_batch = []
@@ -135,9 +140,9 @@ class TrainDataset():
         #print(video_annotations_indeces_batch.shape)
 
         return video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch
-
+'''
 #seperate changes
-class ValidationDataset():
+class ValidationDataset(Dataset):
     def __init__(self, root='./data/valid/'):
         self.valid_frames = []
         self.valid_annotations = []
@@ -170,11 +175,12 @@ class ValidationDataset():
     def __len__(self):
         return len(self.valid_frames)
 
-    def __getitem__(self, video_index=0, object_index=0,initial_frame=0, img_size_x = 224, img_size_y=224):
-        valid_sample_frames = []#torch.zeros(32, 224, 224, 3)
-        valid_sample_annotations = []  # torch.zeros(1, 224, 224)
+    def __getitem__(self, video_index=0, object_index=0, initial_frame=0):
+        img_size_x, img_size_y = 224
+        valid_sample_frames = []    #torch.zeros(32, 224, 224, 3)
+        valid_sample_annotations = []   #torch.zeros(1, 224, 224)
         valid_sample_annotations.append([])
-        valid_sample_annotations_indeces = []#torch.zeros(224, 224, 3)
+        valid_sample_annotations_indeces = []   #torch.zeros(224, 224, 3)
         valid_sample_annotations_indeces.append([])
 
         for frames in range(initial_frame, (initial_frame+32)):
@@ -219,7 +225,7 @@ class ValidationDataset():
         #print(valid_sample_annotations_indeces.shape)
 
         return valid_sample_frames, valid_sample_annotations, valid_sample_annotations_indeces
-
+'''
     def Datalaoder(self, video_index=0, object_index=0,initial_frame=0, img_size_x = 224, img_size_y=224):
         video_inputs_batch = []
         video_annotations_batch = []
@@ -247,7 +253,7 @@ class ValidationDataset():
             video_annotations_batch = video_annotations_batch.cuda()
 
         return video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch
-
+'''
 if __name__ == '__main__':
     train = TrainDataset()
     for i in range(len(train)):

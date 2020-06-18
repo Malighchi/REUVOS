@@ -10,6 +10,8 @@ import torch.optim as optim
 from model import VOSModel
 from PIL import Image
 #from matplotlib import pyplot as plt
+from torch.utils.data import DataLoader
+
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.round(y_pred)
@@ -30,28 +32,34 @@ def get_accuracy(y_pred, y):
 
     return torch.mean((y_argmax==y).type(torch.float))
 
-def train(model, video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch, criterion, optimizer):
+def train(model, dloader, criterion, optimizer):
     model.train()
+    losses, accs = [], []
 
-    optimizer.zero_grad()
-    video_inputs_batch = torch.from_numpy(video_inputs_batch)
-    video_annotations_batch = torch.from_numpy(video_annotations_batch)
-    video_inputs_batch, video_annotations_batch = video_inputs_batch.type(torch.float), video_annotations_batch.type(torch.float)
-    if config.use_cuda:
-        video_inputs_batch = video_inputs_batch.cuda()
-        video_annotations_batch = video_annotations_batch.cuda()
-    #print(video_inputs_batch[:, :, 0])
-    #print(video_annotations_batch[:, :, 0])
+    for i, sample in enumerate(dloader):
+        video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = sample
+        video_annotations_indeces_batch = video_annotations_indeces_batch.cpu().detach().numpy()
 
-    y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
+        optimizer.zero_grad()
+        video_inputs_batch, video_annotations_batch = video_inputs_batch.type(torch.float), video_annotations_batch.type(torch.float)
+		
+        if config.use_cuda:
+            video_inputs_batch = video_inputs_batch.cuda()
+            video_annotations_batch = video_annotations_batch.cuda()
+
+
+        y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
+
+        loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
+        acc = get_accuracy(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
+        loss.backward()
+        optimizer.step()
+		
+        losses.append(loss.item())
+        accs.append(acc.item())
+
     print('Finished predictions...')
-
-    loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
-    acc = get_accuracy(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
-    loss.backward()
-    optimizer.step()
-
-    return loss.item(), acc.item()
+    return float(np.mean(losses)), float(np.mean(accs))
 
 def run_experiment():
     print("runnning...")
@@ -69,9 +77,11 @@ def run_experiment():
     accuracies = []
     for epoch in range(1, config.n_epochs + 1):
         print('Epoch:', epoch)
-        video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = train_dataset.Datalaoder()
+		
+        dloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+        #video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = train_dataset.Datalaoder()
 
-        loss, acc = train(model, video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch, criterion, optimizer)
+        loss, acc = train(model, dloader, criterion, optimizer)
         print('Finished training. Loss: ',  loss, ' Accuracy: ', acc)
         losses.append(loss)
         accuracies.append(acc)
@@ -93,20 +103,20 @@ def run_experiment():
 
             torch.save(states, save_file_path)
             print('Model saved ', str(save_file_path))
-    else:
-        save_file_path = os.path.join(config.save_dir, 'modeel_{}_{:.4f}.pth'.format(epoch, loss))
-        states = {
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-        }
+	
+    save_file_path = os.path.join(config.save_dir, 'modeel_{}_{:.4f}.pth'.format(epoch, loss))
+    states = {
+		'epoch': epoch + 1,
+		'state_dict': model.state_dict(),
+		'optimizer': optimizer.state_dict(),
+	}
 
-        try:
-            os.mkdir(config.save_dir)
-        except:
-            pass
+    try:
+        os.mkdir(config.save_dir)
+    except:
+        pass
 
-        torch.save(states, save_file_path)
+    torch.save(states, save_file_path)
 
     print('Training Finished')
     # multiple line plot
