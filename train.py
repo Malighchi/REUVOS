@@ -8,10 +8,26 @@ from dataloader import TrainDataset, ValidationDataset
 import torch.nn as nn
 import torch.optim as optim
 from model import VOSModel
+from PIL import Image
 #from matplotlib import pyplot as plt
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.round(y_pred)
+
+    #prints = y.cpu().detach().numpy().astype(np.uint8)
+    #train = TrainDataset()
+    #palette = Image.open(train.train_annotations[0][0][0])
+    #for i in range(len(prints[0][0])):
+    #    c = Image.fromarray(prints[0][0][i], mode='P').resize(size=palette.size)
+    #    c.putpalette(palette.getpalette())
+    #    c.save('./SavedImages/%d.png' % i, "PNG", mode='P')
+
+    #prints2 = y_argmax.cpu().detach().numpy().astype(np.uint8)
+    #for i in range(len(prints2[0][0])):
+    #    c = Image.fromarray(prints2[0][0][i], mode='P').resize(size=palette.size)
+    #    c.putpalette(palette.getpalette())
+    #    c.save('./SavedImages/%d pred.png' % i, "PNG", mode='P')
+
     return torch.mean((y_argmax==y).type(torch.float))
 
 def train(model, video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch, criterion, optimizer):

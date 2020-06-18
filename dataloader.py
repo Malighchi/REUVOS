@@ -87,8 +87,8 @@ class TrainDataset():
                 else:
                     annotation = np.zeros((vid_height, vid_width))
 
-                annotation = annotation[new_height_min:new_height_max, new_width_min:new_width_max]
-                frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
+                #annotation = annotation[new_height_min:new_height_max, new_width_min:new_width_max]
+                #frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
 
                 frame = np.array(Image.fromarray(frame).resize(size=(img_size_x, img_size_y)))
                 annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
