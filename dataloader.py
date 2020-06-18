@@ -8,11 +8,11 @@ import torch
 from PIL import Image
 
 class TrainDataset():
-    def __init__(self, root='./data/'):
+    def __init__(self, root='./data/train/'):
         self.train_frames = []
         self.train_annotations = []
 
-        with open(os.path.join(root, 'train/meta.json')) as f_train:
+        with open(os.path.join(root, 'meta.json')) as f_train:
             train_data = json.load(f_train)
 
         for video_folders in train_data['videos']:
@@ -22,13 +22,13 @@ class TrainDataset():
                 object_frames = []
                 object_annotations = []
 
-                video_all_frames = os.listdir(os.path.join(root, 'train/JPEGImages/', video_folders + '/'))
+                video_all_frames = os.listdir(os.path.join(root, 'JPEGImages/', video_folders + '/'))
                 for frames in video_all_frames:
-                    frame = os.path.join(root, 'train/JPEGImages/', video_folders + '/', frames)
+                    frame = os.path.join(root, 'JPEGImages/', video_folders + '/', frames)
                     object_frames.append(frame)
                 for frames in train_data['videos'][video_folders]['objects'][objects]['frames']:
                     #frame = os.path.join(root, 'train/JPEGImages/', video_folders + '/', frames + '.jpg')
-                    annotation = os.path.join(root, 'train/Annotations/', video_folders + '/', frames + '.png')
+                    annotation = os.path.join(root, 'Annotations/', video_folders + '/', frames + '.png')
                     #object_frames.append(frame)
                     object_annotations.append(annotation)
 
@@ -76,18 +76,19 @@ class TrainDataset():
                     new_height_max = vid_height
                     new_width_min = 0
                     new_width_max = vid_width
-                frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
 
                 annotation_path = self.train_frames[index][object][frames].replace('JPEGImages', 'Annotations')
                 annotation_path = annotation_path.replace('jpg', 'png')
                 if(os.path.exists(annotation_path)):
                     annotation = np.array(Image.open(annotation_path))
+                    annotation[annotation != (object + 1)] = 0
                     train_sample_annotations_indeces[0].append(frames-initial_frame)
                     #print(frames)
                 else:
                     annotation = np.zeros((vid_height, vid_width))
 
                 annotation = annotation[new_height_min:new_height_max, new_width_min:new_width_max]
+                frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
 
                 frame = np.array(Image.fromarray(frame).resize(size=(img_size_x, img_size_y)))
                 annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
@@ -137,11 +138,11 @@ class TrainDataset():
 
 #seperate changes
 class ValidationDataset():
-    def __init__(self, root='./data/'):
+    def __init__(self, root='./data/valid/'):
         self.valid_frames = []
         self.valid_annotations = []
 
-        with open(os.path.join(root, 'valid/meta.json')) as f_valid:
+        with open(os.path.join(root, 'meta.json')) as f_valid:
             valid_data = json.load(f_valid)
 
         for video_folders in valid_data['videos']:
@@ -151,13 +152,13 @@ class ValidationDataset():
                 object_frames = []
                 object_annotations = []
 
-                video_all_frames = os.listdir(os.path.join(root, 'valid/JPEGImages/', video_folders + '/'))
+                video_all_frames = os.listdir(os.path.join(root, 'JPEGImages/', video_folders + '/'))
                 for frames in video_all_frames:
-                    frame = os.path.join(root, 'valid/JPEGImages/', video_folders + '/', frames)
+                    frame = os.path.join(root, 'JPEGImages/', video_folders + '/', frames)
                     object_frames.append(frame)
                 for frames in valid_data['videos'][video_folders]['objects'][objects]['frames']:
                     #frame = os.path.join(root, 'valid/JPEGImages/', video_folders + '/', frames + '.jpg')
-                    annotation = os.path.join(root, 'valid/Annotations/', video_folders + '/', frames + '.png')
+                    annotation = os.path.join(root, 'Annotations/', video_folders + '/', frames + '.png')
                     #object_frames.append(frame)
                     object_annotations.append(annotation)
 
@@ -186,6 +187,7 @@ class ValidationDataset():
                 annotation_path = annotation_path.replace('jpg', 'png')
                 if(os.path.exists(annotation_path)):
                     annotation = np.array(Image.open(annotation_path))
+                    annotation[annotation != (object_index + 1)] = 0
                     valid_sample_annotations_indeces[0].append(frames-initial_frame)
                     #print(frames)
                 else:
