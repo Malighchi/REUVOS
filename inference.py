@@ -6,6 +6,7 @@ from PIL import Image
 import torch.nn as nn
 from model import VOSModel
 from dataloader import ValidationDataset
+from torch.utils.data import DataLoader
 
 def inference(model_path = './SavedModels/folder/model.pth'):
 	criterion = nn.BCELoss(reduction='mean')
@@ -19,57 +20,54 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 
 	with torch.no_grad():
 		valid_dataset = ValidationDataset()
+		dloader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=8)
 		print('dataset loaded...')
-		for video in range(170, len(valid_dataset.valid_frames)):
+		for i, sample in enumerate(dloader):
+			video_inputs_batch, video_annotations_batch, video_indeces_batch = sample
+			video_indeces_batch = video_indeces_batch.cpu().detach().numpy()
+			if config.use_cuda:
+				video_inputs_batch = video_inputs_batch.cuda()
+				video_annotations_batch = video_annotations_batch.cuda()
 			segs_concat = np.array([])
-			for object in range(len(valid_dataset.valid_frames[video])):
-				frame = 0
+			for object in range(len(valid_dataset.valid_frames[i])):
+				start_frame = 0
+				num_frames = 32
 				y_pred_concat = np.array([])
-				while frame < len(valid_dataset.valid_frames[video][object]):
-					# Batch-size of model during inference would be 1, because we compute segmentations for 1 video at-a-time
-					if(frame == 0):
-						#initial_frame_path = valid_dataset.valid_annotations[video][object][0].replace('Annotations', 'JPEGImages')
-						#initial_frame_path = initial_frame_path.replace('png', 'jpg')
-						#frame = valid_dataset.valid_frames[video][object].index(initial_frame_path)
-						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame)
-						last_frame = video_annotations_batch[:, :, 0]
+				while start_frame < len(valid_dataset.valid_frames[i][object]):
+					if(start_frame == 0):
+						start_frame = int(video_indeces_batch[0][0][object])
+						last_frame = video_annotations_batch[:, :, object]
 					else:
 						last_frame = y_pred[:, :, -1]
-						video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch = valid_dataset.Datalaoder(video_index=video, object_index=object, initial_frame=frame)
-					#print(video_inputs_batch.shape)
-					#print(video_annotations_batch.shape)
-					#print(video_annotations_indeces_batch.shape)
-					#last_array = torch.round(last_frame).cpu().numpy().astype(np.uint8)
-					y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], last_frame)
-					loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
-					print(loss.item())
-					frame += 32
+					if (start_frame + num_frames) >= len(valid_dataset.valid_frames[i][object]):
+						num_frames = len(valid_dataset.valid_frames[i][object]) - start_frame
+					frame_selection = range(start_frame, start_frame+num_frames)
+					y_pred, _ = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame)
+					#loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
+					#print(loss.item())
+					start_frame += 32
 					if y_pred_concat.size == 0:
-						y_pred_concat = torch.round(y_pred).cpu().numpy().astype(np.uint8)
+						y_pred_concat = torch.round(y_pred).cpu().numpy()
 					else:
-						y_pred_concat = np.concatenate((y_pred_concat, torch.round(y_pred).cpu().numpy().astype(np.uint8)), axis=2)
+						y_pred_concat = np.concatenate((y_pred_concat, torch.round(y_pred).cpu().numpy()), axis=2)
 				if segs_concat.size == 0:
-					segs_concat = y_pred_concat
+					test_ann = (np.ones((y_pred_concat.shape)) *.000009)
+					segs_concat = np.concatenate((test_ann, y_pred_concat), axis=1)
 				else:
 					segs_concat = np.concatenate((segs_concat, y_pred_concat), axis=1)
-					#print("finsihed object segmentation...")
-					#annotation = (y_pred[0][0][0].cpu().numpy() * 255).astype(np.uint8)
-					#c = Image.fromarray(annotation, mode='P')
-					#c.putpalette(Image.ADAPTIVE)
-					#c.save(str(frame) + '.png', "PNG", mode='P')
-					#print("segmentation saved...")
+
 			segs_concat = (segs_concat.squeeze(0))
-			mask_for_frames = np.argmax(segs_concat, axis=0)
+			mask_for_frames = np.argmax(segs_concat, axis=0).astype(dtype=np.uint8)
 			print("finsihed object segmentation...")
-			video_file = valid_dataset.valid_frames[video][0][0].split('/')
+			video_file = valid_dataset.valid_frames[i][0][0].split('/')
 			try:
 				dir = 'Annotations/%s/' % video_file[-2]
 				os.mkdir(dir)
 			except:
 				pass
-			palette = Image.open(valid_dataset.valid_annotations[video][0][0])
-			for images in range(len(valid_dataset.valid_frames[video][0])):
-				img_file = valid_dataset.valid_frames[video][0][images].split('/')
+			palette = Image.open(valid_dataset.valid_annotations[i][0][0])
+			for images in range(len(valid_dataset.valid_frames[i][0])):
+				img_file = valid_dataset.valid_frames[i][0][images].split('/')
 				c = Image.fromarray(mask_for_frames[images], mode='P').resize(size=palette.size)
 				c.putpalette(palette.getpalette())
 				img_path = dir + img_file[-1]
@@ -78,4 +76,4 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 			print("segmentation saved...")
 	
 if __name__ == '__main__':
-    inference(config.model_path)
+	inference(config.model_path)
