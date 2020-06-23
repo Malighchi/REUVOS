@@ -37,11 +37,15 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 					if(start_frame == 0):
 						start_frame = int(video_indeces_batch[0][0][object])
 						last_frame = video_annotations_batch[:, :, object]
+						if start_frame > len(y_pred_concat):
+							y_pred_concat = torch.from_numpy(np.zeroes((1, 1, start_frame, 224, 224)))
 					else:
 						last_frame = y_pred[:, :, -1]
 					if (start_frame + num_frames) >= len(valid_dataset.valid_frames[i][object]):
 						num_frames = len(valid_dataset.valid_frames[i][object]) - start_frame
 					frame_selection = range(start_frame, start_frame+num_frames)
+					while len(frame_selection) < 32:
+						frame_selection.append(frame_selection[-1])
 					y_pred, _ = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame)
 					#loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
 					#print(loss.item())
@@ -50,6 +54,8 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 						y_pred_concat = torch.round(y_pred).cpu().numpy()
 					else:
 						y_pred_concat = np.concatenate((y_pred_concat, torch.round(y_pred).cpu().numpy()), axis=2)
+				frames_to_use = range(len(valid_dataset.valid_frames[i][0]))
+				y_pred_concat = y_pred_concat[:, :, frames_to_use, :, :]
 				if segs_concat.size == 0:
 					test_ann = (np.ones((y_pred_concat.shape)) *.000009)
 					segs_concat = np.concatenate((test_ann, y_pred_concat), axis=1)
