@@ -67,39 +67,31 @@ class Encoder_M(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, n_features_in):
         super(Decoder, self).__init__()
-
         self.skip_connection1 = nn.Sequential(nn.Conv3d(256, 128, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
         self.skip_connection2 = nn.Sequential(nn.Conv3d(128, 64, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
         self.skip_connection3 = nn.Sequential(nn.Conv3d(64, 32, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
-
         self.conv_transpose1 = nn.Sequential(nn.ConvTranspose3d(n_features_in, 128, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
-        self.conv_transpose2 = nn.Sequential(nn.ConvTranspose3d(128+128, 64, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
-        self.conv_transpose3 = nn.Sequential(nn.ConvTranspose3d(64+64, 32, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
-        #self.conv_transpose4 = nn.Sequential(nn.ConvTranspose3d(32+32, 32, (1, 3, 3), (1, 2, 2), padding=(0, 1, 1), output_padding=(0, 1, 1)), nn.ReLU())
+        self.conv_transpose2 = nn.Sequential(nn.ConvTranspose3d(128 + 128, 64, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
+        self.conv_transpose3 = nn.Sequential(nn.ConvTranspose3d(64 + 64, 32, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
 
-        self.segment_layer = nn.Sequential(nn.Conv3d(32+32, 1, (1, 1, 1)), nn.Sigmoid())
+        self.conv_smooth = nn.Sequential(nn.Conv3d(32 + 32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.ReLU())
+        self.segment_layer = nn.Sequential(nn.Conv3d(32, 1, (1, 1, 1)), nn.Sigmoid())
 
     def forward(self, cond_features, vid_feats1, vid_feats2, vid_feats3):
-
         x = self.conv_transpose1(cond_features)
         skip_connection1 = self.skip_connection1(vid_feats1)
         x = torch.cat([x, skip_connection1], 1)
-
         x = self.conv_transpose2(x)
         skip_connection2 = self.skip_connection2(vid_feats2)
         x = torch.cat([x, skip_connection2], 1)
-
         x = self.conv_transpose3(x)
         skip_connection3 = self.skip_connection3(vid_feats3)
         x = torch.cat([x, skip_connection3], 1)
-
-        x = self.segment_layer(x) # self.conv_transpose4(x)
-
-        #print(x.shape)
+        x = self.conv_smooth(x)
+        x = self.segment_layer(x)
+        # print(x.shape)
         interp = F.interpolate(x.squeeze(1), scale_factor=2, mode='bilinear', align_corners=False)
-
         return interp.unsqueeze(1)
-
 
 class ConvLSTMCell(nn.Module):
 
