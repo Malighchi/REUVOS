@@ -58,40 +58,48 @@ class Encoder_M(nn.Module):
 
         x = self.resnet_children[0](f) + self.conv1_m(m)
 
+        children = []
         for i, child in enumerate(self.resnet_children[1:]):
             x = child(x)
+            children.append(x)
 
-        return x
+        return children
 
 
 class Decoder(nn.Module):
     def __init__(self, n_features_in):
         super(Decoder, self).__init__()
-        self.skip_connection1 = nn.Sequential(nn.Conv3d(256, 128, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
-        self.skip_connection2 = nn.Sequential(nn.Conv3d(128, 64, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
+        self.skip_connection1 = nn.Sequential(nn.Conv3d(128, 128, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
+        self.skip_connection2 = nn.Sequential(nn.Conv3d(64, 64, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
         self.skip_connection3 = nn.Sequential(nn.Conv3d(64, 32, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
+
         self.conv_transpose1 = nn.Sequential(nn.ConvTranspose3d(n_features_in, 128, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
         self.conv_transpose2 = nn.Sequential(nn.ConvTranspose3d(128 + 128, 64, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
         self.conv_transpose3 = nn.Sequential(nn.ConvTranspose3d(64 + 64, 32, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
 
         self.conv_smooth = nn.Sequential(nn.Conv3d(32 + 32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.ReLU())
-        self.segment_layer = nn.Sequential(nn.Conv3d(32, 1, (1, 1, 1)), nn.Sigmoid())
+        self.segment_layer = nn.Sequential(nn.Conv3d(32, 1, (1, 3, 3), padding=(0, 1, 1)), nn.Sigmoid())
 
-    def forward(self, cond_features, vid_feats1, vid_feats2, vid_feats3):
-        x = self.conv_transpose1(cond_features)
-        skip_connection1 = self.skip_connection1(vid_feats1)
+    def forward(self, cond_features1, cond_features2, cond_features3, vid_feats3):
+        x = self.conv_transpose1(cond_features1)
+
+        skip_connection1 = self.skip_connection1(cond_features2)
         x = torch.cat([x, skip_connection1], 1)
         x = self.conv_transpose2(x)
-        skip_connection2 = self.skip_connection2(vid_feats2)
+
+        skip_connection2 = self.skip_connection2(cond_features3)
         x = torch.cat([x, skip_connection2], 1)
         x = self.conv_transpose3(x)
+
         skip_connection3 = self.skip_connection3(vid_feats3)
         x = torch.cat([x, skip_connection3], 1)
+
         x = self.conv_smooth(x)
         x = self.segment_layer(x)
-        # print(x.shape)
+
         interp = F.interpolate(x.squeeze(1), scale_factor=2, mode='bilinear', align_corners=False)
         return interp.unsqueeze(1)
+
 
 class ConvLSTMCell(nn.Module):
 
@@ -277,6 +285,32 @@ class ConvLSTM(nn.Module):
         return param
 
 
+class LSTMOp(nn.Module):
+    def __init__(self, in_vid_feature_dim, in_frame_feature_dim, hidden_dim):
+        super(LSTMOp, self).__init__()
+
+        h_state_dim = hidden_dim
+
+        self.init_h = nn.Conv2d(in_frame_feature_dim, h_state_dim, (3, 3), padding=(1, 1))
+        self.init_c = nn.Conv2d(in_frame_feature_dim, h_state_dim, (3, 3), padding=(1, 1))
+
+        self.conv_lstm = ConvLSTM(in_vid_feature_dim, h_state_dim, (3, 3), 1, batch_first=True)
+
+    def forward(self, vid_features, frame_features, previous_state=None):
+        # vid_features should have shape (B, F_vid, T, H, W)
+        # frame_features should have shape (B, F_frames, H, W)
+
+        vid_features_transposed = vid_features.permute(0, 2, 1, 3, 4)  # (B, T, F_frames, H, W)
+
+        if previous_state is None:
+            previous_state = [[self.init_h(frame_features), self.init_c(frame_features)]]
+
+        layer_output_list, last_state_list = self.conv_lstm(vid_features_transposed, previous_state)
+        layer_output = layer_output_list[-1].permute(0, 2, 1, 3, 4)
+
+        return layer_output, last_state_list
+
+
 class VOSModel(nn.Module):
     def __init__(self):
         super(VOSModel, self).__init__()
@@ -286,17 +320,16 @@ class VOSModel(nn.Module):
 
         self.frame_encoder = Encoder_M()
 
-        h_state_dim = 256
-        self.conv_lstm = ConvLSTM(512, h_state_dim, (3, 3), 1, batch_first=True)
-
-        self.init_h, self.init_c = nn.Conv2d(256, h_state_dim, (3, 3), padding=(1, 1)), nn.Conv2d(256, h_state_dim, (3, 3), padding=(1, 1))
+        self.lstm_op1 = LSTMOp(512, 256, 256)
+        self.lstm_op2 = LSTMOp(256, 128, 128)
+        self.lstm_op3 = LSTMOp(128, 64, 64)
 
         self.decoder = Decoder(256)
 
         self.register_buffer('mean', torch.FloatTensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1, 1))
         self.register_buffer('std', torch.FloatTensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1, 1))
 
-    def forward(self, video_input, first_frame, object_mask, previous_state=None):
+    def forward(self, video_input, first_frame, object_mask, previous_state=(None, None, None)):
 
         # passes the input video through the R3D network (First four layers)
 
@@ -307,24 +340,19 @@ class VOSModel(nn.Module):
             video_layers.append(child(x))
             x = video_layers[-1]
 
-        r3d_features = x  # (B, 512, T/8, H/16, H/16)
-
         # obtains the features from first frame + mask
-        first_frame_features = self.frame_encoder(first_frame, object_mask)  # (B, 256, H/16, H/16)
+        frame_layers = self.frame_encoder(first_frame, object_mask)  # (B, 256, H/16, H/16)
 
-        # LSTM propogates information from first frame and segmentation
-        r3d_feats_transposed = r3d_features.permute(0, 2, 1, 3, 4)
+        layer_output, last_state_list = self.lstm_op1(video_layers[-1], frame_layers[-1], previous_state[-1])
 
-        if previous_state is None:
-            previous_state = [[self.init_h(first_frame_features), self.init_c(first_frame_features)]]
+        layer_output2, last_state_list2 = self.lstm_op2(video_layers[-2], frame_layers[-2], previous_state[-2])
 
-        layer_output_list, last_state_list = self.conv_lstm(r3d_feats_transposed, previous_state)
-        layer_output = layer_output_list[-1].permute(0, 2, 1, 3, 4)
+        layer_output3, last_state_list3 = self.lstm_op3(video_layers[-3], frame_layers[-3], previous_state[-3])
 
         # decoder network
-        segmentation = self.decoder(layer_output, video_layers[3], video_layers[2], video_layers[1])
+        segmentation = self.decoder(layer_output, layer_output2, layer_output3, video_layers[1])
 
-        return segmentation, last_state_list
+        return segmentation, [last_state_list3, last_state_list2, last_state_list]
 
 
 if __name__ == '__main__':
@@ -351,4 +379,3 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
         print(loss)
-
