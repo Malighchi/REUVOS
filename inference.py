@@ -49,7 +49,7 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 					y_pred, _ = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame)
 					#loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
 					#print(loss.item())
-					start_frame += 32
+					start_frame += 31
 					if y_pred_concat.size == 0:
 						y_pred_concat = torch.round(y_pred).cpu().numpy()
 					else:
