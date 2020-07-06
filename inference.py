@@ -33,28 +33,32 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 				start_frame = 0
 				num_frames = 32
 				y_pred_concat = np.array([])
-				while start_frame < len(valid_dataset.valid_frames[i][object]):
+				while start_frame < (len(valid_dataset.valid_frames[i][object]) - 1):
 					if(start_frame == 0):
 						start_frame = int(video_indeces_batch[0][0][object])
 						last_frame = video_annotations_batch[:, :, object]
 						if start_frame > len(y_pred_concat):
-							y_pred_concat = torch.from_numpy(np.zeroes((1, 1, start_frame, 224, 224)))
+							y_pred_concat = torch.from_numpy(np.zeros((1, 1, start_frame, 224, 224)))
 					else:
-						last_frame = y_pred[:, :, -1]
+						last_frame = y_pred[:, :, 15]
 					if (start_frame + num_frames) >= len(valid_dataset.valid_frames[i][object]):
 						num_frames = len(valid_dataset.valid_frames[i][object]) - start_frame
-					frame_selection = range(start_frame, start_frame+num_frames)
+					frame_selection = list(range(start_frame, start_frame+num_frames))
 					while len(frame_selection) < 32:
 						frame_selection.append(frame_selection[-1])
 					y_pred, _ = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame)
 					#loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
 					#print(loss.item())
-					start_frame += 31
 					if y_pred_concat.size == 0:
 						y_pred_concat = torch.round(y_pred).cpu().numpy()
 					else:
-						y_pred_concat = np.concatenate((y_pred_concat, torch.round(y_pred).cpu().numpy()), axis=2)
-				frames_to_use = range(len(valid_dataset.valid_frames[i][0]))
+						y_pred_np = torch.round(y_pred).cpu().numpy()
+						for index in range(start_frame, len(y_pred_concat[0][0])):
+							y_pred_concat[0][0][index] = y_pred_np[0][0][0]
+							y_pred_np = np.delete(y_pred_np, 0, axis=2)
+						y_pred_concat = np.concatenate((y_pred_concat, y_pred_np), axis=2)
+					start_frame += 15
+				frames_to_use = list(range(len(valid_dataset.valid_frames[i][0])))
 				y_pred_concat = y_pred_concat[:, :, frames_to_use, :, :]
 				if segs_concat.size == 0:
 					test_ann = (np.ones((y_pred_concat.shape)) *.000009)
@@ -64,7 +68,7 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 
 			segs_concat = (segs_concat.squeeze(0))
 			mask_for_frames = np.argmax(segs_concat, axis=0).astype(dtype=np.uint8)
-			print("finsihed object segmentation...")
+			print("finished object segmentation...")
 			video_file = valid_dataset.valid_frames[i][0][0].split('/')
 			try:
 				dir = 'Annotations/%s/' % video_file[-2]
