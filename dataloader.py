@@ -50,6 +50,8 @@ class TrainDataset(Dataset):
         train_sample_annotations.append([])
         train_sample_annotations_indeces = []#torch.zeros(224, 224, 3)
         train_sample_annotations_indeces.append([])
+        
+        train_sample_mask = np.zeros((32, ))
 
         object = random.randint(0, len(self.train_frames[index])-1)
         rand_ann = len(self.train_annotations[index][object]) - 8
@@ -87,9 +89,11 @@ class TrainDataset(Dataset):
                     annotation = np.array(Image.open(annotation_path))
                     annotation[annotation != (object + 1)] = 0
                     train_sample_annotations_indeces[0].append(frames-initial_frame)
+                    train_sample_mask[frames-initial_frame] = 1
                     #print(frames)
                 else:
                     annotation = np.zeros((vid_height, vid_width))
+                    train_sample_mask[frames-initial_frame] = 0
 
                 #annotation = annotation[new_height_min:new_height_max, new_width_min:new_width_max]
                 #frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
@@ -116,12 +120,41 @@ class TrainDataset(Dataset):
         train_sample_annotations_indeces = np.stack(train_sample_annotations_indeces, 0)
         #print(train_sample_annotations_indeces.shape)
 
+        train_sample_mask = np.reshape(train_sample_mask, (1, 32, 1, 1))
+        if config.skew_weight == True:
+            train_sample_mask[:, 20:] *= 3 
+
+        
         train_sample_frames = torch.from_numpy(train_sample_frames).type(torch.float)
         train_sample_annotations = torch.from_numpy(train_sample_annotations).type(torch.float)
         train_sample_annotations_indeces = torch.from_numpy(train_sample_annotations_indeces).type(torch.float)
 
-        return train_sample_frames, train_sample_annotations, train_sample_annotations_indeces
+        return train_sample_frames, train_sample_annotations, train_sample_annotations_indeces, train_sample_mask
 
+'''
+    def Datalaoder(self):
+        video_inputs_batch = []
+        video_annotations_batch = []
+        video_annotations_indeces_batch = []
+        indexes = [*range(len(self.train_frames) - 1)]
+        index = 0
+        random.shuffle(indexes)
+        for i in range(config.batch_size):
+            video_inputs, video_annotations, video_annotations_indeces = self.__getitem__(index=indexes[index])
+            index += 1
+            video_inputs_batch.append(video_inputs)
+            video_annotations_batch.append(video_annotations)
+            video_annotations_indeces_batch.append(video_annotations_indeces)
+
+        video_inputs_batch = np.stack(video_inputs_batch, 0)
+        #print(video_inputs_batch.shape)
+        video_annotations_batch = np.stack(video_annotations_batch, 0)
+        #print(video_annotations_batch.shape)
+        video_annotations_indeces_batch = np.stack(video_annotations_indeces_batch, 0)
+        #print(video_annotations_indeces_batch.shape)
+
+        return video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch
+'''
 #seperate changes
 class ValidationDataset(Dataset):
     def __init__(self, root='./data/valid/'):
@@ -156,50 +189,87 @@ class ValidationDataset(Dataset):
     def __len__(self):
         return len(self.valid_frames)
 
-    def __getitem__(self, index):
+    def __getitem__(self, video_index=0, object_index=0, initial_frame=0):
         img_size_x = 224
         img_size_y = 224
         valid_sample_frames = []    #torch.zeros(32, 224, 224, 3)
         valid_sample_annotations = []   #torch.zeros(1, 224, 224)
         valid_sample_annotations.append([])
-        valid_sample_start_frame_indeces = []   #torch.zeros(224, 224, 3)
-        valid_sample_start_frame_indeces.append([])
+        valid_sample_annotations_indeces = []   #torch.zeros(224, 224, 3)
+        valid_sample_annotations_indeces.append([])
 
-        for frames in range(len(self.valid_frames[index][0])):
+        for frames in range(initial_frame, (initial_frame+32)):
             try:
-                frame = np.array(Image.open(self.valid_frames[index][0][frames]))
+                frame = np.array(Image.open(self.valid_frames[video_index][object_index][frames]))
+                if(frames-initial_frame == 0):
+                    vid_height, vid_width, _ = frame.shape
+
+                annotation_path = self.valid_frames[video_index][object_index][frames].replace('JPEGImages', 'Annotations')
+                annotation_path = annotation_path.replace('jpg', 'png')
+                if(os.path.exists(annotation_path)):
+                    annotation = np.array(Image.open(annotation_path))
+                    annotation[annotation != (object_index + 1)] = 0
+                    valid_sample_annotations_indeces[0].append(frames-initial_frame)
+                    #print(frames)
+                else:
+                    annotation = np.zeros((vid_height, vid_width))
+
                 frame = np.array(Image.fromarray(frame).resize(size=(img_size_x, img_size_y)))
+                annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
 
                 valid_sample_frames.append(frame)
+                valid_sample_annotations[0].append(annotation)
             except:
                 valid_sample_frames.append(valid_sample_frames[-1])
-        for objects in range(len(self.valid_frames[index])):
-            annotation_path = self.valid_annotations[index][objects][0]
-            annotation = np.array(Image.open(annotation_path))
-            annotation[annotation != (objects + 1)] = 0
-            annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
+                valid_sample_annotations[0].append(valid_sample_annotations[0][-1])
 
-            initial_frame_path = annotation_path.replace('Annotations', 'JPEGImages')
-            initial_frame_path = initial_frame_path.replace('png', 'jpg')
-            initial_frame = self.valid_frames[index][objects].index(initial_frame_path)
-
-            valid_sample_start_frame_indeces[0].append(initial_frame)
-            valid_sample_annotations[0].append(annotation)
+        if len(valid_sample_annotations_indeces[0]) == 0:
+            while (len(valid_sample_annotations_indeces[0]) < 7):
+                valid_sample_annotations_indeces[0].append(0)
+        while(len(valid_sample_annotations_indeces[0]) < 7):
+            valid_sample_annotations_indeces[0].append(valid_sample_annotations_indeces[0][-1])
+        while (len(valid_sample_annotations_indeces[0]) > 7):
+            valid_sample_annotations_indeces[0].pop()
 
         valid_sample_frames = np.stack(valid_sample_frames, 0)
         valid_sample_frames = np.transpose(valid_sample_frames, (3, 0, 1, 2))
         #print(valid_sample_frames.shape)
         valid_sample_annotations = np.stack(valid_sample_annotations, 0)
         #print(valid_sample_annotations.shape)
-        valid_sample_annotations_indeces = np.stack(valid_sample_start_frame_indeces, 0)
+        valid_sample_annotations_indeces = np.stack(valid_sample_annotations_indeces, 0)
         #print(valid_sample_annotations_indeces.shape)
 
-        valid_sample_frames = torch.from_numpy(valid_sample_frames).type(torch.float)
-        valid_sample_annotations = torch.from_numpy(valid_sample_annotations).type(torch.float)
-        valid_sample_annotations_indeces = torch.from_numpy(valid_sample_annotations_indeces).type(torch.float)
         return valid_sample_frames, valid_sample_annotations, valid_sample_annotations_indeces
+'''
+    def Datalaoder(self, video_index=0, object_index=0,initial_frame=0, img_size_x = 224, img_size_y=224):
+        video_inputs_batch = []
+        video_annotations_batch = []
+        video_annotations_indeces_batch = []
 
+        for i in range(1):
+            video_inputs, video_annotations, video_annotations_indeces = self.__getitem__(video_index, object_index,initial_frame, img_size_x, img_size_y)
+            video_inputs_batch.append(video_inputs)
+            video_annotations_batch.append(video_annotations)
+            video_annotations_indeces_batch.append(video_annotations_indeces)
+
+        video_inputs_batch = np.stack(video_inputs_batch, 0)
+        #print(video_inputs_batch.shape)
+        video_annotations_batch = np.stack(video_annotations_batch, 0)
+        #print(video_annotations_batch.shape)
+        video_annotations_indeces_batch = np.stack(video_annotations_indeces_batch, 0)
+        #print(video_annotations_indeces_batch.shape)
+
+        video_inputs_batch = torch.from_numpy(video_inputs_batch)
+        video_annotations_batch = torch.from_numpy(video_annotations_batch)
+        video_inputs_batch, video_annotations_batch = video_inputs_batch.type(torch.float), video_annotations_batch.type(torch.float)
+        test = video_annotations_batch.numpy()
+        if config.use_cuda:
+            video_inputs_batch = video_inputs_batch.cuda()
+            video_annotations_batch = video_annotations_batch.cuda()
+
+        return video_inputs_batch, video_annotations_batch, video_annotations_indeces_batch
+'''
 if __name__ == '__main__':
-    valid = ValidationDataset()
-    for i in range(len(valid)):
-        x, y, z = valid.__getitem__(i)
+    train = TrainDataset()
+    for i in range(len(train)):
+        x, y, z = train.__getitem__(i)
