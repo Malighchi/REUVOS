@@ -88,7 +88,7 @@ class TrainDataset(Dataset):
                 '''
                 annotation_path = self.train_frames[index][object][frames].replace('JPEGImages', 'Annotations')
                 annotation_path = annotation_path.replace('jpg', 'png')
-                if(annotation_path in self.train_annotations):
+                if(annotation_path in self.train_annotations[index][object]):
                     annotation = np.array(Image.open(annotation_path))
                     annotation[annotation != (object + 1)] = 0
                     train_sample_annotations_indeces[0].append(frames-initial_frame)
