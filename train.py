@@ -22,22 +22,27 @@ def save_images(y_pred, y):
     y = y * 255
 
     y_argmax = torch.round(y_pred)
-    y_pred = y_pred * 255
+    y_argmax = y_argmax * 255
 
     prints = y.cpu().detach().numpy().astype(np.uint8)
     #train = TrainDataset()
     #palette = Image.open(train.train_annotations[0][0][0])
     for i in range(len(prints[0][0])):
-        c = Image.fromarray(prints[0][0][i], mode='P')#.resize(size=palette.size)
-        #c.putpalette(palette.getpalette())
-        c.save('./SavedImages/%d_%d.png' % (i, config.epoch), "PNG", mode='P')
-
+        try:
+            c = Image.fromarray(prints[0][0][i], mode='P')#.resize(size=palette.size)
+            #c.putpalette(palette.getpalette())
+            c.save('./SavedImages/%d_%d.png' % (i, config.epoch), "PNG", mode='P')
+        except:
+            print('error saving %d_%d.png' % (i, config.epoch))
     prints2 = y_argmax.cpu().detach().numpy().astype(np.uint8)
     for i in range(len(prints2[0][0])):
-        c = Image.fromarray(prints2[0][0][i], mode='P')#.resize(size=palette.size)
-        #c.putpalette(palette.getpalette())
-        c.save('./SavedImages/%d_%d pred.png' % (i, config.epoch), "PNG", mode='P')
-
+        try:
+            c = Image.fromarray(prints2[0][0][i], mode='P')#.resize(size=palette.size)
+            #c.putpalette(palette.getpalette())
+            c.save('./SavedImages/%d_%d pred.png' % (i, config.epoch), "PNG", mode='P')
+        except:
+            print('error saving %d_%d pred.png' % (i, config.epoch))
+            
 def train(model, dloader, criterion, optimizer):
     model.train()
     losses, accs = [], []
@@ -58,7 +63,7 @@ def train(model, dloader, criterion, optimizer):
         y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
         #print('Finished prediction %d...' % i)
         loss = criterion(y_pred, video_annotations_batch) * video_annotations_mask_batch
-        loss = loss.mean()
+        loss = loss.sum()
         acc = get_accuracy(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
         if i == 0:
             save_images(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
@@ -83,7 +88,7 @@ def run_experiment():
 
     if config.use_cuda:
         model.cuda()
-    optimizer = torch.optim.Adam(model.parameters(), weight_decay=config.weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(), weight_decay=config.weight_decay, lr=config.learning_rate)
     print("model loaded...")
     best_loss = 1000000
 
