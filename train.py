@@ -63,7 +63,7 @@ def train(model, dloader, criterion, optimizer):
         y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
         #print('Finished prediction %d...' % i)
         loss = criterion(y_pred, video_annotations_batch) * video_annotations_mask_batch
-        loss = loss.sum() / (224 * 224 * y_pred.shape[0])
+        loss = loss.sum() / (224 * 224 * config.batch_size)
         acc = get_accuracy(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
         if i == 0:
             save_images(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
