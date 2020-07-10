@@ -77,10 +77,10 @@ class Decoder(nn.Module):
         self.conv_transpose2 = nn.Sequential(nn.ConvTranspose3d(128, 64, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
         self.conv_transpose3 = nn.Sequential(nn.ConvTranspose3d(64, 32, (3, 3, 3), (2, 2, 2), padding=(1, 1, 1), output_padding=(1, 1, 1)), nn.ReLU())
 
-        self.conv_smooth1 = nn.Sequential(nn.Conv3d(128 + 128, 128, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
-        self.conv_smooth2 = nn.Sequential(nn.Conv3d(64 + 64, 64, (3, 3, 3), padding=(1, 1, 1)), nn.ReLU())
-        self.conv_smooth3 = nn.Sequential(nn.Conv3d(32 + 32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.ReLU())
-        self.conv_smooth4 = nn.Sequential(nn.Conv3d(32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.ReLU())
+        self.conv_smooth1 = nn.Sequential(nn.Conv3d(128 + 128, 128, (3, 3, 3), padding=(1, 1, 1)), nn.BatchNorm3d(128), nn.ReLU())
+        self.conv_smooth2 = nn.Sequential(nn.Conv3d(64 + 64, 64, (3, 3, 3), padding=(1, 1, 1)), nn.BatchNorm3d(64), nn.ReLU())
+        self.conv_smooth3 = nn.Sequential(nn.Conv3d(32 + 32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.BatchNorm3d(32), nn.ReLU())
+        self.conv_smooth4 = nn.Sequential(nn.Conv3d(32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.BatchNorm3d(32), nn.ReLU())
 
         self.segment_layer = nn.Sequential(nn.Conv3d(32, 1, (1, 3, 3), padding=(0, 1, 1)), nn.Sigmoid())
 
