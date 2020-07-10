@@ -5,7 +5,8 @@ from datetime import datetime
 use_cuda = cuda.is_available()
 
 n_epochs = 50
-batch_size = 2
+batch_size = 12
+n_num_frames = 16
 
 learning_rate = 1e-3
 weight_decay = 1e-7
