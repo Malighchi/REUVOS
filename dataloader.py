@@ -49,8 +49,8 @@ class TrainDataset(Dataset):
         train_sample_annotations.append([])
         train_sample_annotations_indeces = []#torch.zeros(224, 224, 3)
         train_sample_annotations_indeces.append([])
-        
-        train_sample_mask = np.zeros((32, ))
+
+        train_sample_mask = np.zeros((config.n_frames, ))
 
         object = random.randint(0, len(self.train_frames[index])-1)
         rand_ann = len(self.train_annotations[index][object]) - 8
@@ -60,8 +60,9 @@ class TrainDataset(Dataset):
         initial_frame_path = self.train_annotations[index][object][initial_annotation].replace('Annotations', 'JPEGImages')
         initial_frame_path = initial_frame_path.replace('png', 'jpg')
         initial_frame = self.train_frames[index][object].index(initial_frame_path)
-
-        for frames in range(initial_frame, (initial_frame+32)):
+        
+        #print("here")
+        for frames in range(initial_frame, (initial_frame+config.n_frames)):
             try:
                 #print(frames)
                 #print(self.train_frames[index][object][frames])
@@ -91,6 +92,7 @@ class TrainDataset(Dataset):
                 if(annotation_path in self.train_annotations[index][object]):
                     annotation = np.array(Image.open(annotation_path))
                     annotation[annotation != (object + 1)] = 0
+                    annotation = np.clip(annotation, 0, 1)
                     train_sample_annotations_indeces[0].append(frames-initial_frame)
                     train_sample_mask[frames-initial_frame] = 1
                     #print(frames)
@@ -124,7 +126,7 @@ class TrainDataset(Dataset):
         train_sample_annotations_indeces = np.stack(train_sample_annotations_indeces, 0)
         #print(train_sample_annotations_indeces.shape)
 
-        train_sample_mask = np.reshape(train_sample_mask, (1, 32, 1, 1))
+        train_sample_mask = np.reshape(train_sample_mask, (1, config.n_frames, 1, 1))
         if config.skew_weight == True:
             train_sample_mask[:, 20:] *= 3 
         
@@ -144,7 +146,7 @@ class TrainDataset(Dataset):
             # c.putpalette(palette.getpalette())
             c.save('./Print/%d_ann.png' % i, "PNG", mode='P')
         '''
-
+        
         return train_sample_frames, train_sample_annotations, train_sample_annotations_indeces, train_sample_mask
 
 #seperate changes

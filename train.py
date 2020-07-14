@@ -60,10 +60,18 @@ def train(model, dloader, criterion, optimizer):
             video_annotations_batch = video_annotations_batch.cuda()
             video_annotations_mask_batch = video_annotations_mask_batch.cuda()
 
-        y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
+        y_pred_logits, y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
+
         #print('Finished prediction %d...' % i)
-        loss = criterion(y_pred, video_annotations_batch) * video_annotations_mask_batch
+        if config.bce_w_logits:
+            loss = criterion(y_pred_logits, video_annotations_batch) * video_annotations_mask_batch
+        else:
+            loss = criterion(y_pred, video_annotations_batch) * video_annotations_mask_batch
         loss = loss.sum() / (224 * 224 * config.batch_size)
+        if loss <= 0:
+            print(loss, y_pred.max(), y_pred.min(), y_pred.mean())
+            print(video_annotations_mask_batch.max(), video_annotations_mask_batch.min(), video_annotations_mask_batch.mean())
+            exit()
         acc = get_accuracy(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
         if i == 0:
             save_images(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
@@ -80,7 +88,10 @@ def run_experiment():
     print("runnning...")
     train_dataset = TrainDataset()
     print("dataset loaded...")
-    criterion = nn.BCELoss(reduction='none')
+    if config.bce_w_logits:
+        criterion = nn.BCEWithLogitsLoss(reduction='none')
+    else:
+        criterion = nn.BCELoss(reduction='none')
     model = VOSModel()
 
     #load_model = torch.load(config.model_path)

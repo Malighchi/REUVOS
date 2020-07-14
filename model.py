@@ -82,7 +82,8 @@ class Decoder(nn.Module):
         self.conv_smooth3 = nn.Sequential(nn.Conv3d(32 + 32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.BatchNorm3d(32), nn.ReLU())
         self.conv_smooth4 = nn.Sequential(nn.Conv3d(32, 32, (3, 3, 3), (1, 1, 1), padding=(1, 1, 1)), nn.BatchNorm3d(32), nn.ReLU())
 
-        self.segment_layer = nn.Sequential(nn.Conv3d(32, 1, (1, 3, 3), padding=(0, 1, 1)), nn.Sigmoid())
+        self.segment_layer = nn.Conv3d(32, 1, (1, 3, 3), padding=(0, 1, 1))
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, cond_features1, cond_features2, cond_features3, vid_feats3):
         x = self.conv_transpose1(cond_features1)
@@ -108,8 +109,9 @@ class Decoder(nn.Module):
 
         x = self.segment_layer(x)
 
-        interp = F.interpolate(x.squeeze(1), scale_factor=2, mode='bilinear', align_corners=False)
-        return interp.unsqueeze(1)
+        interp = F.interpolate(x.squeeze(1), scale_factor=2, mode='bilinear', align_corners=False).unsqueeze(1)
+        interp_sigmoid = self.sigmoid(interp)
+        return interp, interp_sigmoid
 
 
 class ConvLSTMCell(nn.Module):
@@ -361,9 +363,9 @@ class VOSModel(nn.Module):
         layer_output3, last_state_list3 = self.lstm_op3(video_layers[-3], frame_layers[-3], previous_state[-3])
 
         # decoder network
-        segmentation = self.decoder(layer_output, layer_output2, layer_output3, video_layers[1])
+        logits, segmentation = self.decoder(layer_output, layer_output2, layer_output3, video_layers[1])
 
-        return segmentation, [last_state_list3, last_state_list2, last_state_list]
+        return logits, segmentation, [last_state_list3, last_state_list2, last_state_list]
 
 
 if __name__ == '__main__':
