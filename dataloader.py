@@ -62,13 +62,17 @@ class TrainDataset(Dataset):
         initial_frame = self.train_frames[index][object].index(initial_frame_path)
         
         #print("here")
-        for frames in range(initial_frame, (initial_frame+config.n_frames)):
+        frames = initial_frame
+        n_frames = config.n_frames
+        frame_index = 0
+        skipped_frames = 0
+        while frames < (initial_frame+n_frames):
             try:
                 #print(frames)
                 #print(self.train_frames[index][object][frames])
                 frame = np.array(Image.open(self.train_frames[index][object][frames]))
                 
-                if(frames-initial_frame == 0):
+                if(frame_index == 0):
                     vid_height, vid_width, _ = frame.shape
                 '''
                 if(vid_width >vid_height):
@@ -93,12 +97,17 @@ class TrainDataset(Dataset):
                     annotation = np.array(Image.open(annotation_path))
                     annotation[annotation != (object + 1)] = 0
                     annotation = np.clip(annotation, 0, 1)
-                    train_sample_annotations_indeces[0].append(frames-initial_frame)
-                    train_sample_mask[frames-initial_frame] = 1
+                    train_sample_annotations_indeces[0].append(frame_index)
+                    train_sample_mask[frame_index] = 1
                     #print(frames)
                 else:
+                    if random.random < 0.08 and skipped_frames < 4:
+                        frames += 1
+                        n_frames += 1
+                        skipped_frames += 1
+                        continue
                     annotation = np.zeros((vid_height, vid_width))
-                    train_sample_mask[frames-initial_frame] = 0
+                    train_sample_mask[frame_index] = 0
 
                 #annotation = annotation[new_height_min:new_height_max, new_width_min:new_width_max]
                 #frame = frame[new_height_min:new_height_max, new_width_min:new_width_max]
@@ -111,6 +120,9 @@ class TrainDataset(Dataset):
             except:
                 train_sample_frames.append(train_sample_frames[-1])
                 train_sample_annotations[0].append(train_sample_annotations[0][-1])
+
+            frames+=1
+            frame_index+=1
 
         
         while(len(train_sample_annotations_indeces[0]) < 7):
@@ -125,6 +137,11 @@ class TrainDataset(Dataset):
         #print(train_sample_annotations.shape)
         train_sample_annotations_indeces = np.stack(train_sample_annotations_indeces, 0)
         #print(train_sample_annotations_indeces.shape)
+
+        if np.all(train_sample_annotations[0][0] == 0):
+            new_index = random.randint(3470)
+            new_train_sample_frames, new_train_sample_annotations, new_train_sample_annotations_indeces, new_train_sample_mask = self.__getitem__(new_index)
+            return new_train_sample_frames, new_train_sample_annotations, new_train_sample_annotations_indeces, new_train_sample_mask
 
         train_sample_mask = np.reshape(train_sample_mask, (1, config.n_frames, 1, 1))
         if config.skew_weight == True:
@@ -205,6 +222,7 @@ class ValidationDataset(Dataset):
             annotation_path = self.valid_annotations[index][objects][0]
             annotation = np.array(Image.open(annotation_path))
             annotation[annotation != (objects + 1)] = 0
+            annotation = np.clip(annotation, 0, 1)
             annotation = np.array(Image.fromarray(annotation).resize(size=(img_size_x, img_size_y)))
 
             initial_frame_path = annotation_path.replace('Annotations', 'JPEGImages')
