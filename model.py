@@ -352,7 +352,7 @@ class VOSModel(nn.Module):
         for i, child in enumerate(self.r2plus1d_model_children):
             video_layers.append(child(x))
             x = video_layers[-1]
-            print(x.shape)
+            #print(x.shape)
 
         # obtains the features from first frame + mask
         frame_layers = self.frame_encoder(first_frame, object_mask)  # (B, 256, H/16, H/16)
