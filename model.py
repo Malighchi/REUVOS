@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchvision.models.video import r3d_18
+from torchvision.models.video import r2plus1d_18
 from torchvision.models import resnet18
 import torch.nn.functional as F
 
@@ -328,8 +328,8 @@ class VOSModel(nn.Module):
     def __init__(self):
         super(VOSModel, self).__init__()
 
-        self.r3d_model = r3d_18(pretrained=True, progress=True)
-        self.r3d_model_children = list(self.r3d_model.children())[:5]
+        self.r2plus1d_model = r2plus1d_18(pretrained=True, progress=True)
+        self.r2plus1d_model_children = list(self.r2plus1d_model.children())[:5]
 
         self.frame_encoder = Encoder_M()
 
@@ -349,9 +349,10 @@ class VOSModel(nn.Module):
         video_layers = []
 
         x = (video_input - self.mean) / self.std
-        for i, child in enumerate(self.r3d_model_children):
+        for i, child in enumerate(self.r2plus1d_model_children):
             video_layers.append(child(x))
             x = video_layers[-1]
+            print(x.shape)
 
         # obtains the features from first frame + mask
         frame_layers = self.frame_encoder(first_frame, object_mask)  # (B, 256, H/16, H/16)
@@ -369,9 +370,9 @@ class VOSModel(nn.Module):
 
 
 if __name__ == '__main__':
-    video_inputs = torch.autograd.Variable(torch.rand(4, 3, 32, 224, 224))
-    first_frame_inputs = torch.autograd.Variable(torch.rand(4, 3, 224, 224))
-    object_mask_inputs = torch.autograd.Variable(torch.rand(4, 1, 224, 224))
+    video_inputs = torch.autograd.Variable(torch.rand(1, 3, 32, 224, 224))
+    first_frame_inputs = torch.autograd.Variable(torch.rand(1, 3, 224, 224))
+    object_mask_inputs = torch.autograd.Variable(torch.rand(1, 1, 224, 224))
     if torch.cuda.is_available():
         video_inputs = video_inputs.cuda()
         first_frame_inputs = first_frame_inputs.cuda()
@@ -385,10 +386,6 @@ if __name__ == '__main__':
         #model = torch.nn.DataParallel(model)
         model.cuda()
 
-    for i in range(10):
-        segs, _ = model(video_inputs, first_frame_inputs, object_mask_inputs)
+    y_pred_logits, y_pred, hidden_state = model(video_inputs, first_frame_inputs, object_mask_inputs)
+    print("done")
 
-        loss = criterion(segs, video_inputs[:, 0:1]*0)
-        loss.backward()
-        optimizer.step()
-        print(loss)
