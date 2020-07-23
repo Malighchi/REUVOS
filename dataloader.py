@@ -101,7 +101,7 @@ class TrainDataset(Dataset):
                     train_sample_mask[frame_index] = 1
                     #print(frames)
                 else:
-                    if random.random < 0.08 and skipped_frames < 4:
+                    if random.random() < 0.08 and skipped_frames < 4:
                         frames += 1
                         n_frames += 1
                         skipped_frames += 1
@@ -139,9 +139,7 @@ class TrainDataset(Dataset):
         #print(train_sample_annotations_indeces.shape)
 
         if np.all(train_sample_annotations[0][0] == 0):
-            new_index = random.randint(3470)
-            new_train_sample_frames, new_train_sample_annotations, new_train_sample_annotations_indeces, new_train_sample_mask = self.__getitem__(new_index)
-            return new_train_sample_frames, new_train_sample_annotations, new_train_sample_annotations_indeces, new_train_sample_mask
+            train_sample_mask *= 0
 
         train_sample_mask = np.reshape(train_sample_mask, (1, config.n_frames, 1, 1))
         if config.skew_weight == True:
