@@ -46,7 +46,10 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 					frame_selection = list(range(start_frame, start_frame+num_frames))
 					while len(frame_selection) < 32:
 						frame_selection.append(frame_selection[-1])
-					y_pred_logits, y_pred, _ = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame)
+					if start_frame == 0 or not config.use_hidden_state:
+						_, y_pred, hidden_state = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame)
+					elif config.use_hidden_state:
+						_, y_pred, hidden_state = model(video_inputs_batch[:, :, frame_selection, :, :], video_inputs_batch[:, :, start_frame], last_frame, hidden_state)
 					#loss = criterion(y_pred[:, :, video_annotations_indeces_batch[0][0], :, :], video_annotations_batch[:, :, video_annotations_indeces_batch[0][0], :, :])
 					#print(loss.item())
 					if y_pred_concat.size == 0:
