@@ -60,8 +60,9 @@ def train(model, dloader, criterion, optimizer):
             video_annotations_batch = video_annotations_batch.cuda()
             video_annotations_mask_batch = video_annotations_mask_batch.cuda()
 
-        clip1 = video_inputs_batch[:, :, :config.n_frames]  
-        clip2 = video_inputs_batch[:, :, config.n_frames:] 
+        n_frames = config.n_frames//2
+        clip1 = video_inputs_batch[:, :, :n_frames]
+        clip2 = video_inputs_batch[:, :, n_frames:]
         print(clip1.shape)
         print(clip2.shape)
 
