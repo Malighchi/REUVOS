@@ -53,7 +53,7 @@ class TrainDataset(Dataset):
         train_sample_mask = np.zeros((config.n_frames, ))
 
         object = random.randint(0, len(self.train_frames[index])-1)
-        rand_ann = len(self.train_annotations[index][object]) - 8
+        rand_ann = len(self.train_annotations[index][object]) - 5
         if rand_ann < 0:
             rand_ann = 0
         initial_annotation = random.randint(0,rand_ann)
@@ -65,7 +65,12 @@ class TrainDataset(Dataset):
         frames = initial_frame
         n_frames = config.n_frames
         frame_index = 0
-        skipped_frames = 0
+        dropped_frames = 0
+        max_dropped_frames = random.randint(0,4)
+        skip_frames = False
+        #if random.random() < 0.15:
+        #    n_frames *= 2
+        #    skip_frames = True
         while frames < (initial_frame+n_frames):
             try:
                 #print(frames)
@@ -101,10 +106,10 @@ class TrainDataset(Dataset):
                     train_sample_mask[frame_index] = 1
                     #print(frames)
                 else:
-                    if random.random() < 0.08 and skipped_frames < 4:
+                    if random.random() < 0.08 and dropped_frames < max_dropped_frames:
                         frames += 1
                         n_frames += 1
-                        skipped_frames += 1
+                        dropped_frames += 1
                         continue
                     annotation = np.zeros((vid_height, vid_width))
                     train_sample_mask[frame_index] = 0
@@ -121,13 +126,17 @@ class TrainDataset(Dataset):
                 train_sample_frames.append(train_sample_frames[-1])
                 train_sample_annotations[0].append(train_sample_annotations[0][-1])
 
-            frames+=1
+            if skip_frames:
+                frames+=2
+            else:
+                frames+=1
+            
             frame_index+=1
 
         
-        while(len(train_sample_annotations_indeces[0]) < 7):
+        while(len(train_sample_annotations_indeces[0]) < 4):
             train_sample_annotations_indeces[0].append(train_sample_annotations_indeces[0][-1])
-        while (len(train_sample_annotations_indeces[0]) > 7):
+        while (len(train_sample_annotations_indeces[0]) > 4):
             train_sample_annotations_indeces[0].pop()
 
         train_sample_frames = np.stack(train_sample_frames, 0)
