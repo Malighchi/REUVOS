@@ -60,7 +60,18 @@ def train(model, dloader, criterion, optimizer):
             video_annotations_batch = video_annotations_batch.cuda()
             video_annotations_mask_batch = video_annotations_mask_batch.cuda()
 
-        y_pred_logits, y_pred, _ = model(video_inputs_batch, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
+        clip1 = video_inputs_batch[:, :, :config.n_frames]  
+        clip2 = video_inputs_batch[:, :, config.n_frames:] 
+        print(clip1.shape)
+        print(clip2.shape)
+
+        y_pred_logits1, y_pred1, y_hidden_state1 = model(clip1 , video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0])
+
+        y_pred_logits2, y_pred2, _ = model(clip2, video_inputs_batch[:, :, 0], video_annotations_batch[:, :, 0], y_hidden_state1)
+
+        y_pred_logits = torch.cat((y_pred_logits1, y_pred_logits2), 2)
+
+        y_pred = torch.cat((y_pred1, y_pred2), 2)
 
         #print('Finished prediction %d...' % i)
         if config.bce_w_logits:
