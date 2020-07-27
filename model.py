@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchvision.models.video import r2plus1d_18
+from torchvision.models.video import r3d_18
 from torchvision.models import resnet18
 import torch.nn.functional as F
 
@@ -328,8 +328,8 @@ class VOSModel(nn.Module):
     def __init__(self):
         super(VOSModel, self).__init__()
 
-        self.r2plus1d_model = r2plus1d_18(pretrained=True, progress=True)
-        self.r2plus1d_model_children = list(self.r2plus1d_model.children())[:5]
+        self.r3d_model = r3d_18(pretrained=True, progress=True)
+        self.r3d_model_children = list(self.r3d_model.children())[:5]
 
         self.frame_encoder = Encoder_M()
 
@@ -349,7 +349,7 @@ class VOSModel(nn.Module):
         video_layers = []
 
         x = (video_input - self.mean) / self.std
-        for i, child in enumerate(self.r2plus1d_model_children):
+        for i, child in enumerate(self.r3d_model_children):
             video_layers.append(child(x))
             x = video_layers[-1]
             #print(x.shape)
