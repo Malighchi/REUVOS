@@ -89,4 +89,17 @@ def inference(model_path = './SavedModels/folder/model.pth'):
 			print("segmentation saved...")
 	
 if __name__ == '__main__':
-	inference(config.model_path)
+	frame_folder = 'frames'
+	seg_folder = 'segs'
+	frames = os.listdir(os.path.join('./Vids/', frame_folder))
+	segs = os.listdir(os.path.join('./Vids/', seg_folder))
+	frames.sort()
+	segs.sort()
+	for frame in range(len(frames)):
+		image = Image.open('./Vids/frames/'+frames[frame])
+		mask = Image.open('./Vids/segs/' + segs[frame])
+		mask = mask.convert('RGBA')
+		transparent = mask.convert("L")
+		final = Image.composite(mask, image, transparent)
+		final.save('./Vids/%d_%d.png' % (1, frame), "PNG", mode='P')
+	#inference(config.model_path)

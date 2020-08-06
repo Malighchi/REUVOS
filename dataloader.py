@@ -53,7 +53,7 @@ class TrainDataset(Dataset):
         train_sample_mask = np.zeros((config.n_frames, ))
 
         object = random.randint(0, len(self.train_frames[index])-1)
-        rand_ann = len(self.train_annotations[index][object]) - 5
+        rand_ann = len(self.train_annotations[index][object]) - (n_anns+1)
         if rand_ann < 0:
             rand_ann = 0
         initial_annotation = random.randint(0,rand_ann)
@@ -106,7 +106,7 @@ class TrainDataset(Dataset):
                     train_sample_mask[frame_index] = 1
                     #print(frames)
                 else:
-                    if random.random() < 0.08 and dropped_frames < max_dropped_frames:
+                    if random.random() < 0.08 and dropped_frames < max_dropped_frames and config.use_fixes:
                         frames += 1
                         n_frames += 1
                         dropped_frames += 1
@@ -134,9 +134,9 @@ class TrainDataset(Dataset):
             frame_index+=1
 
         
-        while(len(train_sample_annotations_indeces[0]) < 4):
+        while(len(train_sample_annotations_indeces[0]) < n_anns):
             train_sample_annotations_indeces[0].append(train_sample_annotations_indeces[0][-1])
-        while (len(train_sample_annotations_indeces[0]) > 4):
+        while (len(train_sample_annotations_indeces[0]) > n_anns):
             train_sample_annotations_indeces[0].pop()
 
         train_sample_frames = np.stack(train_sample_frames, 0)
@@ -147,7 +147,7 @@ class TrainDataset(Dataset):
         train_sample_annotations_indeces = np.stack(train_sample_annotations_indeces, 0)
         #print(train_sample_annotations_indeces.shape)
 
-        if np.all(train_sample_annotations[0][0] == 0):
+        if np.all(train_sample_annotations[0][0] == 0) and config.use_fixes:
             train_sample_mask *= 0
 
         train_sample_mask = np.reshape(train_sample_mask, (1, config.n_frames, 1, 1))
